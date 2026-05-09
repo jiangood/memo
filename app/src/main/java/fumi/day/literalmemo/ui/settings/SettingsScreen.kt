@@ -176,7 +176,7 @@ Since we do not collect any data, there is nothing to retain or delete on our en
 
 Our apps do not collect any personal information from anyone, including children under the age of 13.
 
-Contact: admin@fumi.day""",
+Contact: literalapps@proton.me""",
                             style = MaterialTheme.typography.bodySmall
                         )
                     }
