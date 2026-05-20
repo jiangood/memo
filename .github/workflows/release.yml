@@ -70,7 +70,7 @@ jobs:
           STORE_PASSWORD: ${{ steps.keystore.outputs.password }}
           KEY_ALIAS: ${{ steps.keystore.outputs.alias }}
           KEY_PASSWORD: ${{ steps.keystore.outputs.keypass }}
-        run: ./gradlew assembleRelease
+        run: chmod +x gradlew && ./gradlew assembleRelease
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
