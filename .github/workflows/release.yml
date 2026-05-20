@@ -20,42 +20,47 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Debug secrets
+      - name: Setup keystore
+        id: keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "KEYSTORE_BASE64 length: ${#KEYSTORE_BASE64}"
-          echo "STORE_PASSWORD length: ${#STORE_PASSWORD}"
-          echo "KEY_ALIAS length: ${#KEY_ALIAS}"
-          echo "KEY_PASSWORD length: ${#KEY_PASSWORD}"
-          echo "KEYSTORE_BASE64 first 50 chars: ${KEYSTORE_BASE64:0:50}"
-
-      - name: Setup keystore
-        id: keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
+          echo "b64_len=${#KEYSTORE_BASE64}" >> "$GITHUB_OUTPUT"
           if [ -n "$KEYSTORE_BASE64" ]; then
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > /tmp/keystore.jks || {
-              echo "base64 decode failed"
+            echo "using_secret=true" >> "$GITHUB_OUTPUT"
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > /tmp/keystore.jks
+            if [ $? -ne 0 ]; then
+              echo "decode_status=failed" >> "$GITHUB_OUTPUT"
               exit 1
-            }
+            fi
+            echo "decode_status=ok" >> "$GITHUB_OUTPUT"
+            echo "file_size=$(wc -c < /tmp/keystore.jks)" >> "$GITHUB_OUTPUT"
             echo "path=/tmp/keystore.jks" >> "$GITHUB_OUTPUT"
-            echo "password=${{ secrets.STORE_PASSWORD }}" >> "$GITHUB_OUTPUT"
-            echo "alias=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_OUTPUT"
-            echo "keypass=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_OUTPUT"
+            echo "password=$STORE_PASSWORD" >> "$GITHUB_OUTPUT"
+            echo "alias=$KEY_ALIAS" >> "$GITHUB_OUTPUT"
+            echo "keypass=$KEY_PASSWORD" >> "$GITHUB_OUTPUT"
           else
+            echo "using_secret=false" >> "$GITHUB_OUTPUT"
             keytool -genkey -v -keystore /tmp/ci.jks -alias ci -keyalg RSA -keysize 2048 \
               -validity 10000 -storepass ci123 -keypass ci123 \
               -dname "CN=CI, OU=Unknown, O=Unknown, L=Unknown, ST=Unknown, C=Unknown"
+            echo "decode_status=keytool" >> "$GITHUB_OUTPUT"
             echo "path=/tmp/ci.jks" >> "$GITHUB_OUTPUT"
             echo "password=ci123" >> "$GITHUB_OUTPUT"
             echo "alias=ci" >> "$GITHUB_OUTPUT"
             echo "keypass=ci123" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Debug outputs
+        if: always()
+        run: |
+          echo "b64_len: ${{ steps.keystore.outputs.b64_len }}"
+          echo "using_secret: ${{ steps.keystore.outputs.using_secret }}"
+          echo "decode_status: ${{ steps.keystore.outputs.decode_status }}"
+          echo "file_size: ${{ steps.keystore.outputs.file_size }}"
 
       - name: Build release APK
         env:
