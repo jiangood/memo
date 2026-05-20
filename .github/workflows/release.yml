@@ -31,11 +31,11 @@ jobs:
           echo "b64_len=${#KEYSTORE_BASE64}" >> "$GITHUB_OUTPUT"
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "using_secret=true" >> "$GITHUB_OUTPUT"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > /tmp/keystore.jks
-            if [ $? -ne 0 ]; then
+            printf '%s' "$KEYSTORE_BASE64" > /tmp/keystore.b64
+            base64 --decode /tmp/keystore.b64 > /tmp/keystore.jks || {
               echo "decode_status=failed" >> "$GITHUB_OUTPUT"
               exit 1
-            fi
+            }
             echo "decode_status=ok" >> "$GITHUB_OUTPUT"
             echo "file_size=$(wc -c < /tmp/keystore.jks)" >> "$GITHUB_OUTPUT"
             echo "path=/tmp/keystore.jks" >> "$GITHUB_OUTPUT"
