@@ -5,18 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fumi.day.literalmemo.data.github.GitHubSyncManager
-import fumi.day.literalmemo.data.prefs.UserPreferences
-import fumi.day.literalmemo.data.prefs.UserPrefs
 import fumi.day.literalmemo.data.repository.MemoRepository
 import fumi.day.literalmemo.domain.model.Memo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -28,7 +24,6 @@ import javax.inject.Inject
 class MemoEditViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val memoRepository: MemoRepository,
-    userPreferences: UserPreferences,
     private val syncManager: GitHubSyncManager
 ) : ViewModel() {
 
@@ -45,13 +40,6 @@ class MemoEditViewModel @Inject constructor(
 
     private val _isPreviewMode = MutableStateFlow(!isNewMemo)
     val isPreviewMode: StateFlow<Boolean> = _isPreviewMode.asStateFlow()
-
-    val userPrefs: StateFlow<UserPrefs> = userPreferences.userPrefs
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = UserPrefs()
-        )
 
     fun setInitialContent(content: String?) {
         if (content != null && _content.value.isEmpty()) {
@@ -129,15 +117,14 @@ class MemoEditViewModel @Inject constructor(
         }
     }
 
-    fun deleteMemo(onComplete: () -> Unit) {
+    fun deleteMemo() {
         val fileNameToDelete = _currentFileName.value
-        viewModelScope.launch(Dispatchers.IO) {
-            if (fileNameToDelete != null) {
+        if (fileNameToDelete != null) {
+            viewModelScope.launch(Dispatchers.IO) {
                 memoRepository.delete(fileNameToDelete)
-                syncManager.moveToRemoteTrash(fileNameToDelete)
             }
-            withContext(Dispatchers.Main) {
-                onComplete()
+            viewModelScope.launch(Dispatchers.IO) {
+                syncManager.moveToRemoteTrash(fileNameToDelete)
             }
         }
     }

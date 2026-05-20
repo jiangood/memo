@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableStateOf
 import dagger.hilt.android.AndroidEntryPoint
 import fumi.day.literalmemo.data.DefaultMemoInitializer
 import fumi.day.literalmemo.data.github.GitHubSyncManager
-import fumi.day.literalmemo.data.prefs.UserPreferences
 import fumi.day.literalmemo.ui.App
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,9 +22,6 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var defaultMemoInitializer: DefaultMemoInitializer
-
-    @Inject
-    lateinit var userPreferences: UserPreferences
 
     @Inject
     lateinit var syncManager: GitHubSyncManager
@@ -45,7 +41,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             App(
-                userPreferences = userPreferences,
                 sharedText = sharedTextState.value,
                 onSharedTextConsumed = { sharedTextState.value = null }
             )

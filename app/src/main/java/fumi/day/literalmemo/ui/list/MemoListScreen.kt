@@ -68,7 +68,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import fumi.day.literalmemo.domain.model.Memo
 import fumi.day.literalmemo.domain.model.firstLine
-import fumi.day.literalmemo.ui.theme.LocalAppTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +81,6 @@ fun MemoListScreen(
     val userPrefs by viewModel.userPrefs.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncError by viewModel.syncError.collectAsState()
-    val appTheme = LocalAppTheme.current
 
     var memoToDelete by remember { mutableStateOf<Memo?>(null) }
     var inputText by remember { mutableStateOf("") }
@@ -201,11 +199,11 @@ fun MemoListScreen(
                 }
             }
         },
-        floatingActionButtonPosition = if (userPrefs.fabOnLeft) FabPosition.Start else FabPosition.End,
+        floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onNavigateToEdit(null) },
-                containerColor = appTheme.accentColor,
+                containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
                 Icon(Icons.Default.Add, contentDescription = "New memo")
@@ -243,7 +241,7 @@ fun MemoListScreen(
                     SwipeableMemoItem(
                         memo = memo,
                         searchQuery = searchQuery,
-                        accentColor = appTheme.accentColor,
+                        accentColor = MaterialTheme.colorScheme.primary,
                         isOdd = index % 2 == 0,
                         onClick = { onNavigateToEdit(memo.fileName) },
                         onSwipeToDelete = { memoToDelete = memo }
@@ -338,8 +336,6 @@ private fun MemoItem(
     onClick: () -> Unit
 ) {
     val isSearching = searchQuery.isNotBlank()
-    val appTheme = LocalAppTheme.current
-    val lineHeight = (appTheme.fontSize * 1.8f).dp
 
     Row(
         modifier = Modifier
@@ -359,9 +355,7 @@ private fun MemoItem(
             ) {
                 Text(
                     text = memo.firstLine(),
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontFamily = appTheme.fontFamily
-                    ),
+                    style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -390,7 +384,6 @@ private fun HighlightedSnippet(
     query: String,
     accentColor: Color
 ) {
-    val appTheme = LocalAppTheme.current
     val snippetLength = 60
     val index = content.indexOf(query, ignoreCase = true)
     if (index == -1) return
@@ -420,9 +413,7 @@ private fun HighlightedSnippet(
 
     Text(
         text = annotatedString,
-        style = MaterialTheme.typography.bodySmall.copy(
-            fontFamily = appTheme.fontFamily
-        ),
+        style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis

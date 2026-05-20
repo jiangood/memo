@@ -1,6 +1,5 @@
 package fumi.day.literalmemo.ui.edit
 
-import android.graphics.Typeface
 import android.widget.TextView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -54,11 +53,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.res.ResourcesCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import fumi.day.literalmemo.R
-import fumi.day.literalmemo.data.prefs.AppFont
-import fumi.day.literalmemo.ui.theme.LocalAppTheme
 import io.noties.markwon.Markwon
 import io.noties.markwon.ext.strikethrough.StrikethroughPlugin
 import io.noties.markwon.ext.tables.TablePlugin
@@ -75,8 +70,6 @@ fun MemoEditScreen(
     val content by viewModel.content.collectAsState()
     val isPreviewMode by viewModel.isPreviewMode.collectAsState()
     val currentFileName by viewModel.currentFileName.collectAsState()
-    val userPrefs by viewModel.userPrefs.collectAsState()
-    val appTheme = LocalAppTheme.current
 
     var textFieldValue by remember { mutableStateOf(TextFieldValue(content)) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -96,17 +89,8 @@ fun MemoEditScreen(
         }
     }
 
-    val backgroundColor = if (appTheme.backgroundColor != Color.Unspecified) {
-        appTheme.backgroundColor
-    } else {
-        MaterialTheme.colorScheme.surface
-    }
-
-    val textColor = if (appTheme.textColor != Color.Unspecified) {
-        appTheme.textColor
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
+    val backgroundColor = MaterialTheme.colorScheme.surface
+    val textColor = MaterialTheme.colorScheme.onSurface
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -150,14 +134,12 @@ fun MemoEditScreen(
                 }
             )
         },
-        floatingActionButtonPosition = if (userPrefs.fabOnLeft) FabPosition.Start else FabPosition.End,
+        floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.togglePreviewMode() },
-                containerColor = appTheme.accentColor.takeIf { it != Color.Unspecified }
-                    ?: MaterialTheme.colorScheme.primary,
-                contentColor = appTheme.backgroundColor.takeIf { it != Color.Unspecified }
-                    ?: MaterialTheme.colorScheme.onPrimary
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
                 Icon(
                     imageVector = if (isPreviewMode) Icons.Default.Edit else Icons.Default.Visibility,
@@ -183,8 +165,6 @@ fun MemoEditScreen(
                         content = content,
                         textColor = textColor,
                         backgroundColor = backgroundColor,
-                        fontSize = appTheme.fontSize,
-                        fontFamily = userPrefs.font,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -201,20 +181,16 @@ fun MemoEditScreen(
                             .focusRequester(focusRequester),
                         textStyle = TextStyle(
                             color = textColor,
-                            fontSize = appTheme.fontSize.sp,
-                            fontFamily = appTheme.fontFamily
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         decorationBox = { innerTextField ->
                             Box {
                                 if (textFieldValue.text.isEmpty()) {
-                                    Text(
-                                        text = "Start writing...",
-                                        style = TextStyle(
-                                            color = textColor.copy(alpha = 0.5f),
-                                            fontSize = appTheme.fontSize.sp,
-                                            fontFamily = appTheme.fontFamily
-                                        )
+                                        Text(
+                                            text = "Start writing...",
+                                            style = TextStyle(
+                                                color = textColor.copy(alpha = 0.5f),
+                                            )
                                     )
                                 }
                                 innerTextField()
@@ -245,7 +221,8 @@ fun MemoEditScreen(
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
-                        viewModel.deleteMemo(onNavigateBack)
+                        viewModel.deleteMemo()
+                        onNavigateBack()
                     }
                 ) {
                     Text("Delete")
@@ -288,17 +265,11 @@ private fun MarkdownPreview(
     content: String,
     textColor: Color,
     backgroundColor: Color,
-    fontSize: Float,
-    fontFamily: AppFont,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val textColorInt = textColor.toArgb()
     val backgroundColorInt = backgroundColor.toArgb()
-
-    val scopeOneTypeface = remember(context) {
-        ResourcesCompat.getFont(context, R.font.scopeone)
-    }
 
     val markwon = remember(context, textColorInt, backgroundColorInt) {
         Markwon.builder(context)
@@ -316,7 +287,7 @@ private fun MarkdownPreview(
         factory = { ctx ->
             TextView(ctx).apply {
                 setTextColor(textColorInt)
-                textSize = fontSize
+                textSize = 16f
                 setPadding(48, 48, 48, 48)
                 layoutParams = android.view.ViewGroup.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -326,13 +297,7 @@ private fun MarkdownPreview(
         },
         update = { textView ->
             textView.setTextColor(textColorInt)
-            textView.textSize = fontSize
-            textView.typeface = when (fontFamily) {
-                AppFont.SERIF -> Typeface.SERIF
-                AppFont.MONOSPACE -> Typeface.MONOSPACE
-                AppFont.DEFAULT -> Typeface.DEFAULT
-                AppFont.SCOPE_ONE -> scopeOneTypeface
-            }
+            textView.textSize = 16f
             markwon.setMarkdown(textView, content)
         },
         modifier = modifier.verticalScroll(rememberScrollState())

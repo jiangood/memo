@@ -6,7 +6,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -24,17 +23,7 @@ import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
 
-enum class AppFont {
-    DEFAULT, SERIF, MONOSPACE, SCOPE_ONE
-}
-
 data class UserPrefs(
-    val font: AppFont = AppFont.DEFAULT,
-    val fontSize: Float = 16f,
-    val backgroundColorHex: String = "#F5F5DC",
-    val textColorHex: String = "#000000",
-    val accentColorHex: String = "#6650A4",
-    val fabOnLeft: Boolean = false,
     val gitHubEnabled: Boolean = false,
     val gitHubToken: String = "",
     val gitHubRepo: String = "",
@@ -62,12 +51,6 @@ class UserPreferences @Inject constructor(
     )
 
     private object Keys {
-        val FONT = stringPreferencesKey("font")
-        val FONT_SIZE = floatPreferencesKey("font_size")
-        val BACKGROUND_COLOR = stringPreferencesKey("background_color")
-        val TEXT_COLOR = stringPreferencesKey("text_color")
-        val ACCENT_COLOR = stringPreferencesKey("accent_color")
-        val FAB_ON_LEFT = booleanPreferencesKey("fab_on_left")
         val GITHUB_ENABLED = booleanPreferencesKey("github_enabled")
         val GITHUB_REPO = stringPreferencesKey("github_repo")
         val LAST_SYNCED_AT = longPreferencesKey("last_synced_at")
@@ -79,12 +62,6 @@ class UserPreferences @Inject constructor(
         _gitHubToken
     ) { prefs, token ->
         UserPrefs(
-            font = prefs[Keys.FONT]?.let { AppFont.valueOf(it) } ?: AppFont.DEFAULT,
-            fontSize = prefs[Keys.FONT_SIZE] ?: 16f,
-            backgroundColorHex = prefs[Keys.BACKGROUND_COLOR] ?: "#F5F5DC",
-            textColorHex = prefs[Keys.TEXT_COLOR] ?: "#000000",
-            accentColorHex = prefs[Keys.ACCENT_COLOR] ?: "#6650A4",
-            fabOnLeft = prefs[Keys.FAB_ON_LEFT] ?: false,
             gitHubEnabled = prefs[Keys.GITHUB_ENABLED] ?: false,
             gitHubToken = token,
             gitHubRepo = prefs[Keys.GITHUB_REPO] ?: "",
@@ -99,42 +76,6 @@ class UserPreferences @Inject constructor(
             obj.keys().asSequence().associateWith { obj.getString(it) }
         } catch (e: Exception) {
             emptyMap()
-        }
-    }
-
-    suspend fun setFont(font: AppFont) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.FONT] = font.name
-        }
-    }
-
-    suspend fun setFontSize(size: Float) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.FONT_SIZE] = size
-        }
-    }
-
-    suspend fun setBackgroundColor(hex: String) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.BACKGROUND_COLOR] = hex
-        }
-    }
-
-    suspend fun setTextColor(hex: String) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.TEXT_COLOR] = hex
-        }
-    }
-
-    suspend fun setAccentColor(hex: String) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.ACCENT_COLOR] = hex
-        }
-    }
-
-    suspend fun setFabOnLeft(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.FAB_ON_LEFT] = enabled
         }
     }
 
