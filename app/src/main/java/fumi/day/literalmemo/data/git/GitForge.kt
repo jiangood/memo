@@ -1,7 +1,5 @@
 package fumi.day.literalmemo.data.git
 
-enum class GitForge { GITHUB, GITEA }
-
 data class RemoteFile(
     val path: String,
     val sha: String,

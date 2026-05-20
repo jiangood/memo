@@ -28,10 +28,19 @@ android {
     
     signingConfigs {
         create("release") {
-            storeFile = file("/home/fumi/Documents/AndroidKeys/literal-memo.jks")
-            storePassword = localProperties["STORE_PASSWORD"].toString()
-            keyAlias = localProperties["KEY_ALIAS"].toString()
-            keyPassword = localProperties["KEY_PASSWORD"].toString()
+            val ciKeystorePath = System.getenv("CI_KEYSTORE_PATH")
+            val ciKeystoreFile = ciKeystorePath?.let { file(it) }
+            if (ciKeystoreFile?.exists() == true) {
+                storeFile = ciKeystoreFile
+                storePassword = System.getenv("STORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+            } else if (localPropertiesFile.exists()) {
+                storeFile = file("/root/memo/literal-memo.jks")
+                storePassword = localProperties["STORE_PASSWORD"].toString()
+                keyAlias = localProperties["KEY_ALIAS"].toString()
+                keyPassword = localProperties["KEY_PASSWORD"].toString()
+            }
         }
     }
     

@@ -2,9 +2,7 @@ package fumi.day.literalmemo.data.github
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import fumi.day.literalmemo.data.git.GitForge
 import fumi.day.literalmemo.data.git.GitForgeApi
-import fumi.day.literalmemo.data.git.GiteaRepository
 import fumi.day.literalmemo.data.prefs.UserPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,12 +65,6 @@ class GitHubSyncManager @Inject constructor(
         File(context.filesDir, "pile").also { it.mkdirs() }
     }
 
-    private fun resolveApi(forge: GitForge, host: String): GitForgeApi =
-        when (forge) {
-            GitForge.GITHUB -> gitHubRepository
-            GitForge.GITEA -> GiteaRepository(host)
-        }
-
     fun clearLocalData() {
         pileDir.listFiles()?.forEach { it.delete() }
     }
@@ -80,9 +72,8 @@ class GitHubSyncManager @Inject constructor(
     suspend fun moveToRemoteTrash(fileName: String) {
         val prefs = userPreferences.userPrefs.first()
         if (!prefs.gitHubEnabled || prefs.gitHubToken.isBlank() || prefs.gitHubRepo.isBlank()) return
-        if (prefs.gitForge == GitForge.GITEA && prefs.gitHost.isBlank()) return
 
-        val api = resolveApi(prefs.gitForge, prefs.gitHost)
+        val api = gitHubRepository
         val remoteFiles = api.listPileFiles(prefs.gitHubToken, prefs.gitHubRepo).getOrNull() ?: return
         val remoteFile = remoteFiles.find { it.path.substringAfterLast("/") == fileName } ?: return
         val content = api.getFile(prefs.gitHubToken, prefs.gitHubRepo, remoteFile.path).getOrNull()?.content ?: return
@@ -94,11 +85,8 @@ class GitHubSyncManager @Inject constructor(
         if (!prefs.gitHubEnabled || prefs.gitHubToken.isBlank() || prefs.gitHubRepo.isBlank()) {
             return@withContext null
         }
-        if (prefs.gitForge == GitForge.GITEA && prefs.gitHost.isBlank()) {
-            return@withContext null
-        }
 
-        val api = resolveApi(prefs.gitForge, prefs.gitHost)
+        val api = gitHubRepository
         val result = sync(api, prefs.gitHubToken, prefs.gitHubRepo, prefs.lastSyncedAt, prefs.lastSyncedShas)
         if (result.errors.isEmpty()) {
             userPreferences.setLastSyncedAt(System.currentTimeMillis())
@@ -155,6 +143,8 @@ class GitHubSyncManager @Inject constructor(
                                 if (result.isSuccess) {
                                     uploaded++
                                     result.getOrNull()?.sha?.let { newRemoteShas[fileName] = it }
+                                } else {
+                                    result.exceptionOrNull()?.let { errors.add("Upload $fileName failed: ${it.message}") }
                                 }
                             }
                         }
@@ -163,9 +153,15 @@ class GitHubSyncManager @Inject constructor(
                             if (knownSha != null) {
                                 // Deleted locally → move to remote trash
                                 val remoteFile = remotePileFiles[fileName]!!
-                                val content = api.getFile(token, repo, remoteFile.path).getOrNull()?.content
+                                val contentResult = api.getFile(token, repo, remoteFile.path)
+                                val content = contentResult.getOrNull()?.content
                                 if (content != null) {
-                                    api.moveToTrash(token, repo, fileName, remoteFile.sha, content)
+                                    val trashResult = api.moveToTrash(token, repo, fileName, remoteFile.sha, content)
+                                    if (trashResult.isFailure) {
+                                        trashResult.exceptionOrNull()?.let { errors.add("Trash $fileName failed: ${it.message}") }
+                                    }
+                                } else {
+                                    contentResult.exceptionOrNull()?.let { errors.add("Get remote $fileName for trash failed: ${it.message}") }
                                 }
                             } else {
                                 // New remote file → download
@@ -175,8 +171,9 @@ class GitHubSyncManager @Inject constructor(
                                     File(pileDir, fileName).writeText(contentResult.getOrThrow().content, Charsets.UTF_8)
                                     newRemoteShas[fileName] = remoteFile.sha
                                     downloaded++
+                                } else {
+                                    contentResult.exceptionOrNull()?.let { errors.add("Download $fileName failed: ${it.message}") }
                                 }
-                                // download failure: SHA not tracked → retried on next sync
                             }
                         }
 
@@ -207,7 +204,7 @@ class GitHubSyncManager @Inject constructor(
                                                 uploaded++
                                                 newRemoteShas[fileName] = result.getOrNull()?.sha ?: remoteFile.sha
                                             } else {
-                                                newRemoteShas[fileName] = remoteFile.sha
+                                                result.exceptionOrNull()?.let { errors.add("Upload $fileName failed: ${it.message}") }
                                             }
                                         }
                                         else -> {

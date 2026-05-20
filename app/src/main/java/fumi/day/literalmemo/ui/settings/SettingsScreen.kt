@@ -67,7 +67,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import fumi.day.literalmemo.BuildConfig
-import fumi.day.literalmemo.data.git.GitForge
+
 import fumi.day.literalmemo.data.prefs.AppFont
 import fumi.day.literalmemo.ui.theme.LocalAppTheme
 import fumi.day.literalmemo.ui.theme.parseColor
@@ -166,7 +166,7 @@ fun SettingsScreen(
                         Text(
                             text = """We do not collect, store, or share any personal data. All app data is stored locally on your device. We have no servers and no backend.
 
-Literal Memo includes an optional Git sync feature. If enabled, the app connects directly to a Git repository you specify and control (GitHub, Gitea, Forgejo, or Codeberg). Your data goes only to the repository you configure — not to us.
+Literal Memo includes an optional GitHub sync feature. If enabled, the app connects directly to a GitHub repository you specify and control. Your data goes only to the repository you configure — not to us.
 
 We do not use any analytics, advertising, crash reporting, or third-party SDKs.
 
@@ -212,12 +212,10 @@ Contact: literalapps@proton.me""",
 
     if (showGitDialog) {
         GitSettingsDialog(
-            initialForge = userPrefs.gitForge,
-            initialHost = userPrefs.gitHost,
             initialToken = userPrefs.gitHubToken,
             initialRepo = userPrefs.gitHubRepo,
-            onSave = { forge, host, token, repo ->
-                viewModel.saveGitConfig(forge, host, token, repo)
+            onSave = { token, repo ->
+                viewModel.saveGitConfig(token, repo)
                 showGitDialog = false
             },
             onDismiss = { showGitDialog = false }
@@ -584,7 +582,7 @@ private fun GitSyncCard(
                 }
             } else {
                 Text(
-                    text = if (userPrefs.gitForge == GitForge.GITEA) "Gitea / Forgejo" else "GitHub",
+                    text = "GitHub",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -633,47 +631,20 @@ private fun GitSyncCard(
 
 @Composable
 private fun GitSettingsDialog(
-    initialForge: GitForge,
-    initialHost: String,
     initialToken: String,
     initialRepo: String,
-    onSave: (GitForge, String, String, String) -> Unit,
+    onSave: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var forge by remember { mutableStateOf(initialForge) }
-    var host by remember { mutableStateOf(initialHost) }
     var token by remember { mutableStateOf(initialToken) }
     var repo by remember { mutableStateOf(initialRepo) }
-    val repoWillChange = initialRepo.isNotBlank() && (
-        forge != initialForge || host != initialHost || repo != initialRepo
-    )
+    val repoWillChange = initialRepo.isNotBlank() && repo != initialRepo
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Git Sync") },
+        title = { Text("GitHub Sync") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = forge == GitForge.GITHUB,
-                        onClick = { forge = GitForge.GITHUB },
-                        label = { Text("GitHub") }
-                    )
-                    FilterChip(
-                        selected = forge == GitForge.GITEA,
-                        onClick = { forge = GitForge.GITEA },
-                        label = { Text("Gitea / Forgejo") }
-                    )
-                }
-                if (forge == GitForge.GITEA) {
-                    OutlinedTextField(
-                        value = host,
-                        onValueChange = { host = it },
-                        label = { Text("Host (e.g. https://codeberg.org)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
                 OutlinedTextField(
                     value = token,
                     onValueChange = { token = it },
@@ -699,10 +670,9 @@ private fun GitSettingsDialog(
             }
         },
         confirmButton = {
-            val hostValid = forge == GitForge.GITHUB || host.isNotBlank()
             TextButton(
-                onClick = { onSave(forge, host, token, repo) },
-                enabled = token.isNotBlank() && repo.contains("/") && hostValid
+                onClick = { onSave(token, repo) },
+                enabled = token.isNotBlank() && repo.contains("/")
             ) {
                 Text("Save")
             }

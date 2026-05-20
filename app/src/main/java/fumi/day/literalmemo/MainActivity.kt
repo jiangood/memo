@@ -86,12 +86,6 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun syncInBackground() {
-        scope.launch {
-            try {
-                syncManager.syncIfEnabled()
-            } catch (e: Exception) {
-                // Silent fail for background sync
-            }
-        }
+        syncManager.launchSync()
     }
 }

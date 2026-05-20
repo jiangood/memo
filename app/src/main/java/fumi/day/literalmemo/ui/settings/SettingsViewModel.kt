@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fumi.day.literalmemo.data.github.GitHubSyncManager
 import fumi.day.literalmemo.data.github.SyncResult
-import fumi.day.literalmemo.data.git.GitForge
 import fumi.day.literalmemo.data.prefs.AppFont
 import fumi.day.literalmemo.data.prefs.UserPreferences
 import fumi.day.literalmemo.data.prefs.UserPrefs
@@ -72,12 +71,10 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun saveGitConfig(forge: GitForge, host: String, token: String, repo: String) {
+    fun saveGitConfig(token: String, repo: String) {
         viewModelScope.launch {
             val current = userPreferences.userPrefs.first()
-            val repoChanged = current.gitHubRepo.isNotBlank() && (
-                forge != current.gitForge || host != current.gitHost || repo != current.gitHubRepo
-            )
+            val repoChanged = current.gitHubRepo.isNotBlank() && repo != current.gitHubRepo
             if (repoChanged) {
                 syncManager.clearLocalData()
                 userPreferences.resetSyncState()
@@ -85,9 +82,7 @@ class SettingsViewModel @Inject constructor(
             userPreferences.setGitConfig(
                 enabled = token.isNotBlank() && repo.isNotBlank(),
                 token = token,
-                repo = repo,
-                forge = forge,
-                host = host
+                repo = repo
             )
             if (token.isNotBlank() && repo.isNotBlank()) {
                 syncNow()
