@@ -20,6 +20,19 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Debug secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "KEYSTORE_BASE64 length: ${#KEYSTORE_BASE64}"
+          echo "STORE_PASSWORD length: ${#STORE_PASSWORD}"
+          echo "KEY_ALIAS length: ${#KEY_ALIAS}"
+          echo "KEY_PASSWORD length: ${#KEY_PASSWORD}"
+          echo "KEYSTORE_BASE64 first 50 chars: ${KEYSTORE_BASE64:0:50}"
+
       - name: Setup keystore
         id: keystore
         env:
