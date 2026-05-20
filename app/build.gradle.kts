@@ -50,8 +50,8 @@ android {
         applicationId = "fumi.day.literalmemo"
         minSdk = 26
         targetSdk = 35
-        versionCode = 17
-        versionName = "2.1.0"
+        versionCode = 18
+        versionName = "2.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

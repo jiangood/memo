@@ -1,7 +1,6 @@
 package fumi.day.literalmemo.ui.list
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -27,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,12 +36,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,7 +76,6 @@ fun MemoListScreen(
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncError by viewModel.syncError.collectAsState()
 
-    var memoToDelete by remember { mutableStateOf<Memo?>(null) }
     var inputText by remember { mutableStateOf("") }
     val isSearching = searchQuery.isNotBlank()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -238,13 +231,12 @@ fun MemoListScreen(
                     items = memos,
                     key = { _, memo -> memo.fileName }
                 ) { index, memo ->
-                    SwipeableMemoItem(
+                    MemoItem(
                         memo = memo,
                         searchQuery = searchQuery,
                         accentColor = MaterialTheme.colorScheme.primary,
                         isOdd = index % 2 == 0,
-                        onClick = { onNavigateToEdit(memo.fileName) },
-                        onSwipeToDelete = { memoToDelete = memo }
+                        onClick = { onNavigateToEdit(memo.fileName) }
                     )
                 }
                 item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -252,81 +244,7 @@ fun MemoListScreen(
         }
     }
 
-    memoToDelete?.let { memo ->
-        AlertDialog(
-            onDismissRequest = { memoToDelete = null },
-            title = { Text("Delete?") },
-            text = { Text("This memo will be deleted.") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteMemo(memo.fileName)
-                        memoToDelete = null
-                    }
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { memoToDelete = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SwipeableMemoItem(
-    memo: Memo,
-    searchQuery: String,
-    accentColor: Color,
-    isOdd: Boolean,
-    onClick: () -> Unit,
-    onSwipeToDelete: () -> Unit
-) {
-    val dismissState = rememberSwipeToDismissBoxState(
-        initialValue = SwipeToDismissBoxValue.Settled,
-        confirmValueChange = { dismissValue ->
-            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
-                onSwipeToDelete()
-                false
-            } else {
-                false
-            }
-        }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        backgroundContent = {
-            val color by animateColorAsState(
-                targetValue = when (dismissState.targetValue) {
-                    SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
-                    else -> Color.Transparent
-                },
-                label = "swipe_color"
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(color)
-            )
-        },
-        enableDismissFromStartToEnd = false,
-        enableDismissFromEndToStart = true
-    ) {
-        MemoItem(
-            memo = memo,
-            searchQuery = searchQuery,
-            accentColor = accentColor,
-            isOdd = isOdd,
-            onClick = onClick
-        )
-    }
-}
-
 @Composable
 private fun MemoItem(
     memo: Memo,
