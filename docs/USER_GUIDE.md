@@ -64,24 +64,16 @@ This is useful for "read later" workflow: share links on the go, read them on yo
 
 ## Git Sync
 
-Supports **GitHub**, **Gitea/Forgejo** (including Codeberg), and any compatible Git forge.
+Supports **GitHub** for sync.
 
-### Setup (GitHub)
+### Setup
 
 1. Create a **private** repository on GitHub (e.g., `username/literalmemo`)
 2. Create a Personal Access Token:
    - Go to GitHub → Settings → Developer settings → Personal access tokens
    - Generate a token with `repo` scope
 3. In Literal Memo, go to **Settings**
-4. Select **GitHub**, enter your token and repository (format: `username/repo`)
-5. Tap **Sync**
-
-### Setup (Gitea / Forgejo / Codeberg)
-
-1. Create a **private** repository on your Gitea/Forgejo instance (e.g., Codeberg)
-2. Create an access token in your account settings
-3. In Literal Memo, go to **Settings**
-4. Select **Gitea/Forgejo**, enter the host URL (e.g., `codeberg.org`), token, and repository
+4. Enter your token and repository (format: `username/repo`)
 5. Tap **Sync**
 
 ### How Sync Works
@@ -95,7 +87,7 @@ Supports **GitHub**, **Gitea/Forgejo** (including Codeberg), and any compatible 
 
 ### Switching Repositories
 
-If you change the forge, host, or repository, all local data is cleared on the next sync. The app will then download everything from the new repository. A warning is shown before this happens.
+If you change the host or repository, all local data is cleared on the next sync. The app will then download everything from the new repository. A warning is shown before this happens.
 
 ### Multi-device Usage
 
@@ -157,9 +149,8 @@ return M
 ### Sync not working?
 
 - Check your internet connection
-- Verify your token has the required scope (`repo` for GitHub, appropriate permissions for Gitea/Forgejo)
+- Verify your token has the `repo` scope
 - Make sure the repository exists and is accessible
-- For Gitea/Forgejo, verify the host URL is correct
 - Check Settings to confirm Git Sync is connected
 
 ### Memos not appearing on other device?

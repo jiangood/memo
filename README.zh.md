@@ -15,7 +15,7 @@
 <img width="180" alt="设置界面" src="https://github.com/user-attachments/assets/b6dd2944-d276-4d3a-9377-aac28ea56b48" />
 </p>
 
-[用户指南](./docs/USER_GUIDE.md)
+[用户指南](./docs/USER_GUIDE.zh.md)
 
 ## 为什么？
 
@@ -46,7 +46,7 @@ Literal Memo 建立在一个简单的原则上：
 - **写**：极简 Markdown 编辑器，带工具栏
 - **搜**：所有笔记全文搜索
 - **分享**：从其他应用接收链接和文本
-- **同步**：Git 同步（GitHub、Gitea/Forgejo、Codeberg），启动和编辑后自动同步
+- **同步**：Git 同步（GitHub），启动和编辑后自动同步
 - **定制**：字体、颜色、左手操作模式
 
 ## 工作原理
@@ -115,7 +115,7 @@ Git 同步让你的笔记在多个设备之间保持同步：
 - 如果发生冲突，先同步的设备胜出
 - 所有变更都会保留在 Git 历史中
 
-详细同步说明请参阅[用户指南](docs/USER_GUIDE.md)。
+详细同步说明请参阅[用户指南](docs/USER_GUIDE.zh.md)。
 
 ## 致谢
 
@@ -143,4 +143,4 @@ MIT
 - `literalmemo.vim` — Vim 集成（新建 / 列表 / 搜索）
 - `literalmemo.lua` — 通过 fzf-lua 的 Neovim 集成
 
-详见[用户指南](docs/USER_GUIDE.md)。
+详见[用户指南](docs/USER_GUIDE.zh.md)。

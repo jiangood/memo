@@ -45,7 +45,7 @@ Just text.
 - **Write**: Minimal markdown editor with toolbar
 - **Search**: Full-text search across all memos
 - **Share**: Receive URLs and text from other apps
-- **Sync**: Git sync (GitHub, Gitea/Forgejo, Codeberg) with auto-sync on launch and after editing
+- **Sync**: Git sync (GitHub) with auto-sync on launch and after editing
 - **Customize**: Font, colors, controls on left
 ## How it works
 
