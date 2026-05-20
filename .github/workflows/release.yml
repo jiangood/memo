@@ -39,7 +39,10 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > /tmp/keystore.jks
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > /tmp/keystore.jks || {
+              echo "base64 decode failed"
+              exit 1
+            }
             echo "path=/tmp/keystore.jks" >> "$GITHUB_OUTPUT"
             echo "password=${{ secrets.STORE_PASSWORD }}" >> "$GITHUB_OUTPUT"
             echo "alias=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_OUTPUT"
