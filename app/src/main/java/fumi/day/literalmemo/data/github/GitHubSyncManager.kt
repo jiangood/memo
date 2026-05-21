@@ -106,9 +106,10 @@ class GitHubSyncManager @Inject constructor(
 
             val treeEntries = mutableListOf<TreeEntry>()
 
-            for (trashFile in trashDir.listFiles() ?: emptyList()) {
-                if (!trashFile.name.endsWith(".md")) continue
-                treeEntries.add(TreeEntry(path = "pile/${trashFile.name}", content = null, delete = true))
+            trashDir.listFiles()?.forEach { trashFile ->
+                if (trashFile.name.endsWith(".md")) {
+                    treeEntries.add(TreeEntry(path = "pile/${trashFile.name}", content = null, delete = true))
+                }
             }
 
             val localNames = pileDir.listFiles()
