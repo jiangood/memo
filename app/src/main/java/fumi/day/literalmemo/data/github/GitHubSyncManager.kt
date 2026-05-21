@@ -3,6 +3,7 @@ package fumi.day.literalmemo.data.github
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import fumi.day.literalmemo.data.git.GitForgeApi
+import fumi.day.literalmemo.data.log.OperationLog
 import fumi.day.literalmemo.data.prefs.UserPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,9 +15,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,7 +29,8 @@ data class SyncResult(
 class GitHubSyncManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val gitHubRepository: GitHubRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val operationLog: OperationLog
 ) {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -67,17 +66,7 @@ class GitHubSyncManager @Inject constructor(
 
     fun clearLocalData() {
         pileDir.listFiles()?.forEach { it.delete() }
-    }
-
-    suspend fun moveToRemoteTrash(fileName: String) {
-        val prefs = userPreferences.userPrefs.first()
-        if (!prefs.gitHubEnabled || prefs.gitHubToken.isBlank() || prefs.gitHubRepo.isBlank()) return
-
-        val api = gitHubRepository
-        val remoteFiles = api.listPileFiles(prefs.gitHubToken, prefs.gitHubRepo).getOrNull() ?: return
-        val remoteFile = remoteFiles.find { it.path.substringAfterLast("/") == fileName } ?: return
-        val content = api.getFile(prefs.gitHubToken, prefs.gitHubRepo, remoteFile.path).getOrNull()?.content ?: return
-        api.moveToTrash(prefs.gitHubToken, prefs.gitHubRepo, fileName, remoteFile.sha, content)
+        appScope.launch { operationLog.clear() }
     }
 
     suspend fun syncIfEnabled(): SyncResult? = withContext(Dispatchers.IO) {
@@ -86,8 +75,7 @@ class GitHubSyncManager @Inject constructor(
             return@withContext null
         }
 
-        val api = gitHubRepository
-        val result = sync(api, prefs.gitHubToken, prefs.gitHubRepo, prefs.lastSyncedAt, prefs.lastSyncedShas)
+        val result = sync(gitHubRepository, prefs.gitHubToken, prefs.gitHubRepo)
         if (result.errors.isEmpty()) {
             userPreferences.setLastSyncedAt(System.currentTimeMillis())
             userPreferences.setLastSyncedShas(result.remoteShas)
@@ -95,138 +83,126 @@ class GitHubSyncManager @Inject constructor(
         result
     }
 
-    suspend fun sync(api: GitForgeApi, token: String, repo: String, lastSyncedAt: Long?, lastSyncedShas: Map<String, String> = emptyMap()): SyncResult = withContext(Dispatchers.IO) {
+    suspend fun sync(api: GitForgeApi, token: String, repo: String): SyncResult = withContext(Dispatchers.IO) {
         var uploaded = 0
         var downloaded = 0
         val errors = mutableListOf<String>()
         val newRemoteShas = mutableMapOf<String, String>()
 
         try {
-            val localPileFiles = pileDir.listFiles()
-                ?.filter { it.isFile && it.name.endsWith(".md") }
-                ?.associateBy { it.name }
-                ?: emptyMap()
+            val unsyncedOps = operationLog.unsynced()
+            val handledFiles = mutableSetOf<String>()
+            val succeededOpIds = mutableSetOf<String>()
 
             val remotePileResult = api.listPileFiles(token, repo)
             if (remotePileResult.isFailure) {
-                errors.add("Failed to connect")
-                return@withContext SyncResult(errors = errors)
+                return@withContext SyncResult(errors = listOf("Failed to connect"))
             }
-            val remotePileFiles = remotePileResult.getOrThrow().associateBy { it.path.substringAfterLast("/") }
-
-            val remoteTrashFiles = (api.listTrashFiles(token, repo).getOrNull() ?: emptyList())
+            val remotePileMap = remotePileResult.getOrThrow().associateBy { it.path.substringAfterLast("/") }
+            val remoteTrashMap = (api.listTrashFiles(token, repo).getOrNull() ?: emptyList())
                 .associateBy { it.path.substringAfterLast("/") }
 
-            val allFileNames = (localPileFiles.keys + remotePileFiles.keys + remoteTrashFiles.keys).toSet()
-
-            for (fileName in allFileNames) {
-                val inLocalPile = fileName in localPileFiles
-                val inRemotePile = fileName in remotePileFiles
-                val inRemoteTrash = fileName in remoteTrashFiles
-                val knownSha = lastSyncedShas[fileName]
-
+            for (op in unsyncedOps) {
+                handledFiles.add(op.fileName)
                 try {
-                    when {
-                        inRemoteTrash && inLocalPile -> {
-                            // Another device trashed it → delete locally
-                            localPileFiles[fileName]!!.delete()
-                        }
-
-                        inLocalPile && !inRemotePile && !inRemoteTrash -> {
-                            if (knownSha != null) {
-                                // Was on remote before, now gone → delete locally
-                                localPileFiles[fileName]!!.delete()
-                            } else {
-                                // New local file → upload
-                                val content = localPileFiles[fileName]!!.readText(Charsets.UTF_8)
-                                val result = api.putFile(token, repo, "pile/$fileName", content, message = "Add $fileName")
-                                if (result.isSuccess) {
-                                    uploaded++
-                                    result.getOrNull()?.sha?.let { newRemoteShas[fileName] = it }
-                                } else {
-                                    result.exceptionOrNull()?.let { errors.add("Upload $fileName failed: ${it.message}") }
-                                }
+                    when (op.op) {
+                        "CREATE", "UPDATE" -> {
+                            val content = op.content
+                            if (content.isNullOrBlank()) continue
+                            val remoteFile = remotePileMap[op.fileName]
+                            val sha = remoteFile?.sha
+                            val message = if (sha == null) "Create ${op.fileName}" else "Update ${op.fileName}"
+                            val result = api.putFile(token, repo, "pile/${op.fileName}", content, sha, message)
+                            result.onSuccess {
+                                uploaded++
+                                newRemoteShas[op.fileName] = it.sha
+                                succeededOpIds.add(op.id)
+                            }.onFailure {
+                                errors.add("${op.op} ${op.fileName} failed: ${it.message}")
                             }
                         }
-
-                        !inLocalPile && inRemotePile -> {
-                            if (knownSha != null) {
-                                // Deleted locally → move to remote trash
-                                val remoteFile = remotePileFiles[fileName]!!
-                                val contentResult = api.getFile(token, repo, remoteFile.path)
-                                val content = contentResult.getOrNull()?.content
-                                if (content != null) {
-                                    val trashResult = api.moveToTrash(token, repo, fileName, remoteFile.sha, content)
-                                    if (trashResult.isFailure) {
-                                        trashResult.exceptionOrNull()?.let { errors.add("Trash $fileName failed: ${it.message}") }
-                                    }
-                                } else {
-                                    contentResult.exceptionOrNull()?.let { errors.add("Get remote $fileName for trash failed: ${it.message}") }
-                                }
-                            } else {
-                                // New remote file → download
-                                val remoteFile = remotePileFiles[fileName]!!
+                        "DELETE" -> {
+                            val remoteFile = remotePileMap[op.fileName]
+                            if (remoteFile != null) {
                                 val contentResult = api.getFile(token, repo, remoteFile.path)
                                 if (contentResult.isSuccess) {
-                                    File(pileDir, fileName).writeText(contentResult.getOrThrow().content, Charsets.UTF_8)
-                                    newRemoteShas[fileName] = remoteFile.sha
-                                    downloaded++
+                                    val content = contentResult.getOrThrow().content
+                                    api.moveToTrash(token, repo, op.fileName, remoteFile.sha, content)
+                                        .onSuccess { succeededOpIds.add(op.id) }
+                                        .onFailure { errors.add("Trash ${op.fileName} failed: ${it.message}") }
                                 } else {
-                                    contentResult.exceptionOrNull()?.let { errors.add("Download $fileName failed: ${it.message}") }
-                                }
-                            }
-                        }
-
-                        inLocalPile && inRemotePile -> {
-                            val localFile = localPileFiles[fileName]!!
-                            val remoteFile = remotePileFiles[fileName]!!
-                            val localContent = localFile.readText(Charsets.UTF_8)
-
-                            val remoteContentResult = api.getFile(token, repo, remoteFile.path)
-                            if (remoteContentResult.isSuccess) {
-                                val remoteContent = remoteContentResult.getOrThrow().content
-                                if (localContent != remoteContent) {
-                                    val localChanged = localFile.lastModified() > (lastSyncedAt ?: 0L)
-                                    val remoteChanged = knownSha != null && knownSha != remoteFile.sha
-
-                                    when {
-                                        localChanged && remoteChanged -> {
-                                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                                            val conflictName = fileName.removeSuffix(".md") + "_conflict_$timestamp.md"
-                                            File(pileDir, conflictName).writeText(localContent, Charsets.UTF_8)
-                                            localFile.writeText(remoteContent, Charsets.UTF_8)
-                                            newRemoteShas[fileName] = remoteFile.sha
-                                            downloaded++
-                                        }
-                                        localChanged -> {
-                                            val result = api.putFile(token, repo, "pile/$fileName", localContent, sha = remoteFile.sha, message = "Update $fileName")
-                                            if (result.isSuccess) {
-                                                uploaded++
-                                                newRemoteShas[fileName] = result.getOrNull()?.sha ?: remoteFile.sha
-                                            } else {
-                                                result.exceptionOrNull()?.let { errors.add("Upload $fileName failed: ${it.message}") }
-                                            }
-                                        }
-                                        else -> {
-                                            localFile.writeText(remoteContent, Charsets.UTF_8)
-                                            newRemoteShas[fileName] = remoteFile.sha
-                                            downloaded++
-                                        }
-                                    }
-                                } else {
-                                    newRemoteShas[fileName] = remoteFile.sha
+                                    contentResult.exceptionOrNull()?.let { errors.add("Get ${op.fileName} for trash failed: ${it.message}") }
                                 }
                             } else {
-                                knownSha?.let { newRemoteShas[fileName] = it }
+                                succeededOpIds.add(op.id)
                             }
                         }
                     }
                 } catch (e: Exception) {
-                    errors.add("Error: ${e.message}")
+                    errors.add("Op ${op.id} ${op.op} ${op.fileName} failed: ${e.message}")
                 }
             }
+
+            for (fileName in remoteTrashMap.keys) {
+                if (fileName in handledFiles) continue
+                handledFiles.add(fileName)
+                val localFile = File(pileDir, fileName)
+                if (localFile.exists()) {
+                    localFile.delete()
+                }
+            }
+
+            for ((fileName, remoteFile) in remotePileMap) {
+                if (fileName in handledFiles) continue
+                handledFiles.add(fileName)
+
+                val localFile = File(pileDir, fileName)
+                when {
+                    !localFile.exists() -> {
+                        val contentResult = api.getFile(token, repo, remoteFile.path)
+                        contentResult.onSuccess {
+                            localFile.writeText(it.content, Charsets.UTF_8)
+                            newRemoteShas[fileName] = remoteFile.sha
+                            downloaded++
+                        }.onFailure {
+                            errors.add("Download $fileName failed: ${it.message}")
+                        }
+                    }
+                    else -> {
+                        val localContent = localFile.readText(Charsets.UTF_8)
+                        val contentResult = api.getFile(token, repo, remoteFile.path)
+                        if (contentResult.isSuccess) {
+                            val remoteContent = contentResult.getOrThrow().content
+                            if (localContent != remoteContent) {
+                                localFile.writeText(remoteContent, Charsets.UTF_8)
+                                downloaded++
+                            }
+                            newRemoteShas[fileName] = remoteFile.sha
+                        }
+                    }
+                }
+            }
+
+            val localFiles = pileDir.listFiles()
+                ?.filter { it.isFile && it.name.endsWith(".md") }
+                ?.associateBy { it.name } ?: emptyMap()
+
+            for ((fileName, localFile) in localFiles) {
+                if (fileName in handledFiles) continue
+                val content = localFile.readText(Charsets.UTF_8)
+                val result = api.putFile(token, repo, "pile/$fileName", content, message = "Add $fileName")
+                result.onSuccess {
+                    uploaded++
+                    newRemoteShas[fileName] = it.sha
+                }.onFailure {
+                    errors.add("Upload $fileName failed: ${it.message}")
+                }
+            }
+
+            operationLog.markSynced(succeededOpIds)
+
         } catch (e: Exception) {
-            errors.add("Sync failed")
+            errors.add("Sync failed: ${e.message}")
         }
 
         SyncResult(

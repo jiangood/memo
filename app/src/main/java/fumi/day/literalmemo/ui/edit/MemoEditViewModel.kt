@@ -122,9 +122,7 @@ class MemoEditViewModel @Inject constructor(
         if (fileNameToDelete != null) {
             viewModelScope.launch(Dispatchers.IO) {
                 memoRepository.delete(fileNameToDelete)
-            }
-            viewModelScope.launch(Dispatchers.IO) {
-                syncManager.moveToRemoteTrash(fileNameToDelete)
+                syncManager.launchSync()
             }
         }
     }
