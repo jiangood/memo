@@ -56,6 +56,10 @@ class MemoRepositoryImpl @Inject constructor(
     }
 
     override suspend fun delete(fileName: String) = withContext(Dispatchers.IO) {
-        File(pileDir, fileName).delete()
+        val source = File(pileDir, fileName)
+        if (source.exists()) {
+            val trashDir = File(context.filesDir, "trash").also { it.mkdirs() }
+            source.renameTo(File(trashDir, fileName))
+        }
     }
 }

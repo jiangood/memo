@@ -21,6 +21,7 @@ import javax.inject.Singleton
 data class SyncResult(
     val uploaded: Int = 0,
     val downloaded: Int = 0,
+    val trashed: Int = 0,
     val errors: List<String> = emptyList()
 )
 
@@ -41,6 +42,10 @@ class GitHubSyncManager @Inject constructor(
 
     private val pileDir: File by lazy {
         File(context.filesDir, "pile").also { it.mkdirs() }
+    }
+
+    private val trashDir: File by lazy {
+        File(context.filesDir, "trash").also { it.mkdirs() }
     }
 
     fun launchSync() {
@@ -65,6 +70,7 @@ class GitHubSyncManager @Inject constructor(
 
     fun clearLocalData() {
         pileDir.listFiles()?.forEach { it.delete() }
+        trashDir.listFiles()?.forEach { it.delete() }
     }
 
     private suspend fun syncIfEnabled(): SyncResult? = withContext(Dispatchers.IO) {
@@ -82,6 +88,7 @@ class GitHubSyncManager @Inject constructor(
     private suspend fun sync(token: String, repo: String): SyncResult = withContext(Dispatchers.IO) {
         var uploaded = 0
         var downloaded = 0
+        var trashed = 0
         val errors = mutableListOf<String>()
 
         try {
@@ -93,22 +100,41 @@ class GitHubSyncManager @Inject constructor(
             val remoteTrashNames = (gitHubRepository.listTrashFiles(token, repo).getOrNull() ?: emptyList())
                 .map { it.path.substringAfterLast("/") }.toSet()
 
-            val localFiles = pileDir.listFiles()
-                ?.filter { it.isFile && it.name.endsWith(".md") }
-                ?.associateBy { it.name } ?: emptyMap()
-
-            for (localName in localFiles.keys) {
-                if (localName in remoteTrashNames) {
-                    localFiles[localName]?.delete()
-                }
+            for (name in remoteTrashNames) {
+                File(pileDir, name).delete()
             }
 
-            val currentLocalNames = pileDir.listFiles()
+            val treeEntries = mutableListOf<TreeEntry>()
+
+            for (trashFile in trashDir.listFiles() ?: emptyList()) {
+                if (!trashFile.name.endsWith(".md")) continue
+                treeEntries.add(TreeEntry(path = "pile/${trashFile.name}", content = null, delete = true))
+            }
+
+            val localNames = pileDir.listFiles()
                 ?.filter { it.isFile && it.name.endsWith(".md") }
                 ?.map { it.name }
                 ?.toSet() ?: emptySet()
 
-            for (name in remotePile.keys - currentLocalNames) {
+            val toUpload = localNames - remotePile.keys - remoteTrashNames
+            for (name in toUpload) {
+                val file = File(pileDir, name)
+                treeEntries.add(TreeEntry(path = "pile/$name", content = file.readText(Charsets.UTF_8)))
+            }
+
+            if (treeEntries.isNotEmpty()) {
+                val commitResult = gitTransport.batchCommit(token, repo, treeEntries)
+                if (commitResult.isSuccess) {
+                    val trashCount = trashDir.listFiles()?.count { it.name.endsWith(".md") } ?: 0
+                    trashDir.listFiles()?.forEach { it.delete() }
+                    uploaded = toUpload.size
+                    trashed = trashCount
+                } else {
+                    errors.add("Upload failed: ${commitResult.exceptionOrNull()?.message}")
+                }
+            }
+
+            for (name in remotePile.keys - localNames) {
                 val remoteFile = remotePile[name] ?: continue
                 val contentResult = gitHubRepository.getFile(token, repo, remoteFile.path)
                 if (contentResult.isSuccess) {
@@ -118,25 +144,10 @@ class GitHubSyncManager @Inject constructor(
                     errors.add("Download $name failed: ${contentResult.exceptionOrNull()?.message}")
                 }
             }
-
-            val toUpload = (currentLocalNames - remotePile.keys).mapNotNull { name ->
-                val file = File(pileDir, name)
-                if (file.exists()) TreeEntry(path = "pile/$name", content = file.readText(Charsets.UTF_8))
-                else null
-            }
-
-            if (toUpload.isNotEmpty()) {
-                val result = gitTransport.batchCommit(token, repo, toUpload)
-                if (result.isSuccess) {
-                    uploaded = toUpload.size
-                } else {
-                    errors.add("Upload failed: ${result.exceptionOrNull()?.message}")
-                }
-            }
         } catch (e: Exception) {
             errors.add("Sync failed: ${e.message}")
         }
 
-        SyncResult(uploaded = uploaded, downloaded = downloaded, errors = errors)
+        SyncResult(uploaded = uploaded, downloaded = downloaded, trashed = trashed, errors = errors)
     }
 }
