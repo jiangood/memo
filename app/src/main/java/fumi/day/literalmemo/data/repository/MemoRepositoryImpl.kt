@@ -2,8 +2,9 @@ package fumi.day.literalmemo.data.repository
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import fumi.day.literalmemo.data.log.LogEntry
-import fumi.day.literalmemo.data.log.OperationLog
+import fumi.day.literalmemo.data.log.OpLog
+import fumi.day.literalmemo.data.log.OpType
+import fumi.day.literalmemo.data.log.Operation
 import fumi.day.literalmemo.domain.model.Memo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -18,14 +19,14 @@ import javax.inject.Singleton
 @Singleton
 class MemoRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val operationLog: OperationLog
+    private val opLog: OpLog
 ) : MemoRepository {
 
     private val pileDir: File by lazy {
         File(context.filesDir, "pile").also { it.mkdirs() }
     }
 
-private fun File.toMemo(): Memo? {
+    private fun File.toMemo(): Memo? {
         if (!exists() || !isFile || !name.endsWith(".md")) return null
         return try {
             Memo(
@@ -58,19 +59,17 @@ private fun File.toMemo(): Memo? {
         val file = File(pileDir, memo.fileName)
         val isNew = !file.exists()
         file.writeText(memo.content, Charsets.UTF_8)
-        operationLog.append(LogEntry(
-            op = if (isNew) "CREATE" else "UPDATE",
-            fileName = memo.fileName,
-            content = memo.content
+        opLog.append(Operation(
+            type = if (isNew) OpType.ADD else OpType.MODIFY,
+            path = "pile/${memo.fileName}"
         ))
     }
 
     override suspend fun delete(fileName: String) = withContext(Dispatchers.IO) {
         File(pileDir, fileName).delete()
-        operationLog.append(LogEntry(
-            op = "DELETE",
-            fileName = fileName
+        opLog.append(Operation(
+            type = OpType.DELETE,
+            path = "pile/$fileName"
         ))
-        Unit
     }
 }

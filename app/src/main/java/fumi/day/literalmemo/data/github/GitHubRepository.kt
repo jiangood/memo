@@ -145,4 +145,119 @@ class GitHubRepository @Inject constructor() : GitForgeApi {
             Result.failure(e)
         }
     }
+
+    suspend fun getRef(token: String, repo: String, ref: String = "heads/master"): Result<String> {
+        return try {
+            val (code, body) = makeRequest("GET", "$baseUrl/repos/$repo/git/ref/$ref", token)
+            when (code) {
+                200 -> {
+                    val obj = JSONObject(body)
+                    Result.success(obj.getJSONObject("object").getString("sha"))
+                }
+                else -> Result.failure(Exception("Failed to get ref: $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createBlob(token: String, repo: String, content: String): Result<String> {
+        return try {
+            val encoded = Base64.encodeToString(content.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            val bodyObj = JSONObject().apply {
+                put("content", encoded)
+                put("encoding", "base64")
+            }
+            val (code, body) = makeRequest("POST", "$baseUrl/repos/$repo/git/blobs", token, bodyObj.toString())
+            when (code) {
+                201 -> {
+                    val obj = JSONObject(body)
+                    Result.success(obj.getString("sha"))
+                }
+                else -> Result.failure(Exception("Failed to create blob: $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createTree(
+        token: String,
+        repo: String,
+        baseTree: String?,
+        treeEntries: List<Pair<String, String?>>
+    ): Result<String> {
+        return try {
+            val entries = JSONArray()
+            for ((path, sha) in treeEntries) {
+                val entry = JSONObject().apply {
+                    put("path", path)
+                    put("mode", "100644")
+                    put("type", "blob")
+                    if (sha != null) put("sha", sha)
+                }
+                entries.put(entry)
+            }
+            val bodyObj = JSONObject().apply {
+                put("tree", entries)
+                if (baseTree != null) put("base_tree", baseTree)
+            }
+            val (code, body) = makeRequest("POST", "$baseUrl/repos/$repo/git/trees", token, bodyObj.toString())
+            when (code) {
+                201 -> {
+                    val obj = JSONObject(body)
+                    Result.success(obj.getString("sha"))
+                }
+                else -> Result.failure(Exception("Failed to create tree: $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun createCommit(
+        token: String,
+        repo: String,
+        message: String,
+        treeSha: String,
+        parentSha: String?
+    ): Result<String> {
+        return try {
+            val bodyObj = JSONObject().apply {
+                put("message", message)
+                put("tree", treeSha)
+                if (parentSha != null) {
+                    put("parents", JSONArray(listOf(parentSha)))
+                } else {
+                    put("parents", JSONArray())
+                }
+            }
+            val (code, body) = makeRequest("POST", "$baseUrl/repos/$repo/git/commits", token, bodyObj.toString())
+            when (code) {
+                201 -> {
+                    val obj = JSONObject(body)
+                    Result.success(obj.getString("sha"))
+                }
+                else -> Result.failure(Exception("Failed to create commit: $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateRef(token: String, repo: String, ref: String, sha: String): Result<Unit> {
+        return try {
+            val bodyObj = JSONObject().apply {
+                put("sha", sha)
+                put("force", false)
+            }
+            val (code, _) = makeRequest("PATCH", "$baseUrl/repos/$repo/git/refs/heads/$ref", token, bodyObj.toString())
+            when (code) {
+                200 -> Result.success(Unit)
+                else -> Result.failure(Exception("Failed to update ref: $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

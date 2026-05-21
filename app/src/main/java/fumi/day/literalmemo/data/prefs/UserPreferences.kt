@@ -27,8 +27,7 @@ data class UserPrefs(
     val gitHubEnabled: Boolean = false,
     val gitHubToken: String = "",
     val gitHubRepo: String = "",
-    val lastSyncedAt: Long? = null,
-    val lastSyncedShas: Map<String, String> = emptyMap()
+    val lastSyncedAt: Long? = null
 )
 
 @Singleton
@@ -54,7 +53,6 @@ class UserPreferences @Inject constructor(
         val GITHUB_ENABLED = booleanPreferencesKey("github_enabled")
         val GITHUB_REPO = stringPreferencesKey("github_repo")
         val LAST_SYNCED_AT = longPreferencesKey("last_synced_at")
-        val LAST_SYNCED_SHAS = stringPreferencesKey("last_synced_shas")
     }
 
     val userPrefs: Flow<UserPrefs> = combine(
@@ -65,18 +63,8 @@ class UserPreferences @Inject constructor(
             gitHubEnabled = prefs[Keys.GITHUB_ENABLED] ?: false,
             gitHubToken = token,
             gitHubRepo = prefs[Keys.GITHUB_REPO] ?: "",
-            lastSyncedAt = prefs[Keys.LAST_SYNCED_AT],
-            lastSyncedShas = prefs[Keys.LAST_SYNCED_SHAS]?.let { parseShas(it) } ?: emptyMap()
+            lastSyncedAt = prefs[Keys.LAST_SYNCED_AT]
         )
-    }
-
-    private fun parseShas(json: String): Map<String, String> {
-        return try {
-            val obj = org.json.JSONObject(json)
-            obj.keys().asSequence().associateWith { obj.getString(it) }
-        } catch (e: Exception) {
-            emptyMap()
-        }
     }
 
     suspend fun setGitConfig(enabled: Boolean, token: String, repo: String) {
@@ -93,7 +81,6 @@ class UserPreferences @Inject constructor(
     suspend fun resetSyncState() {
         context.dataStore.edit { prefs ->
             prefs.remove(Keys.LAST_SYNCED_AT)
-            prefs.remove(Keys.LAST_SYNCED_SHAS)
         }
     }
 
@@ -103,19 +90,11 @@ class UserPreferences @Inject constructor(
         }
     }
 
-    suspend fun setLastSyncedShas(shas: Map<String, String>) {
-        val json = org.json.JSONObject(shas).toString()
-        context.dataStore.edit { prefs ->
-            prefs[Keys.LAST_SYNCED_SHAS] = json
-        }
-    }
-
     suspend fun clearGitHubConfig() {
         context.dataStore.edit { prefs ->
             prefs[Keys.GITHUB_ENABLED] = false
             prefs[Keys.GITHUB_REPO] = ""
             prefs.remove(Keys.LAST_SYNCED_AT)
-            prefs.remove(Keys.LAST_SYNCED_SHAS)
         }
         withContext(Dispatchers.IO) {
             encryptedPrefs.edit().remove("github_token").apply()
