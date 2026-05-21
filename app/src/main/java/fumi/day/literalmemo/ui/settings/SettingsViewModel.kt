@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import fumi.day.literalmemo.data.github.GitHubSyncManager
-import fumi.day.literalmemo.data.sync.SyncResult
+import fumi.day.literalmemo.data.github.SyncResult
 import fumi.day.literalmemo.data.prefs.UserPreferences
 import fumi.day.literalmemo.data.prefs.UserPrefs
 import kotlinx.coroutines.flow.MutableStateFlow

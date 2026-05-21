@@ -2,9 +2,6 @@ package fumi.day.literalmemo.data.repository
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import fumi.day.literalmemo.data.log.OpLog
-import fumi.day.literalmemo.data.log.OpType
-import fumi.day.literalmemo.data.log.Operation
 import fumi.day.literalmemo.domain.model.Memo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -18,8 +15,7 @@ import javax.inject.Singleton
 
 @Singleton
 class MemoRepositoryImpl @Inject constructor(
-    @param:ApplicationContext private val context: Context,
-    private val opLog: OpLog
+    @param:ApplicationContext private val context: Context
 ) : MemoRepository {
 
     private val pileDir: File by lazy {
@@ -56,20 +52,10 @@ class MemoRepositoryImpl @Inject constructor(
     }
 
     override suspend fun save(memo: Memo) = withContext(Dispatchers.IO) {
-        val file = File(pileDir, memo.fileName)
-        val isNew = !file.exists()
-        file.writeText(memo.content, Charsets.UTF_8)
-        opLog.append(Operation(
-            type = if (isNew) OpType.ADD else OpType.MODIFY,
-            path = "pile/${memo.fileName}"
-        ))
+        File(pileDir, memo.fileName).writeText(memo.content, Charsets.UTF_8)
     }
 
     override suspend fun delete(fileName: String) = withContext(Dispatchers.IO) {
         File(pileDir, fileName).delete()
-        opLog.append(Operation(
-            type = OpType.DELETE,
-            path = "pile/$fileName"
-        ))
     }
 }
