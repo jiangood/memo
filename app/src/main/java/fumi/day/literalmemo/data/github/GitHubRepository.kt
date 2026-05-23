@@ -209,7 +209,7 @@ class GitHubRepository @Inject constructor() : GitForgeApi {
                     put("path", path)
                     put("mode", "100644")
                     put("type", "blob")
-                    if (sha != null) put("sha", sha)
+                    put("sha", sha ?: JSONObject.NULL)
                 }
                 entries.put(entry)
             }
@@ -223,7 +223,7 @@ class GitHubRepository @Inject constructor() : GitForgeApi {
                     val obj = JSONObject(body)
                     Result.success(obj.getString("sha"))
                 }
-                else -> Result.failure(Exception("Failed to create tree: $code"))
+                else -> Result.failure(Exception("Failed to create tree: $code - $body"))
             }
         } catch (e: Exception) {
             Result.failure(e)
