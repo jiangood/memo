@@ -30,11 +30,11 @@ Release signing: `local.properties` keys `STORE_PASSWORD`, `KEY_ALIAS`, `KEY_PAS
 
 | Workflow | File | Trigger | Artifact |
 |---|---|---|---|
-| **Debug Build** | `.github/workflows/debug.yml` | Push/PR to `main` or `develop` | `debug-apk` (Actions artifact) |
+| **Debug Build** | `.github/workflows/debug.yml` | Push/PR to `main` or `develop` | `debug-apk` (Actions artifact); auto-tags `v{versionName}` on push to `main` if tag doesn't exist |
 | **Release Build** | `.github/workflows/release.yml` | Push tag `v*` | Uploaded to GitHub Release |
 
 ### Debug workflow
-Fires on every push/PR to `main`/`develop`. Builds unsigned debug APK and uploads as a workflow artifact — downloadable from the Actions page.
+Fires on every push/PR to `main`/`develop`. Runs unit tests, builds unsigned debug APK, and uploads as a workflow artifact. On push to `main` with all checks passing, auto-creates tag `v{versionName}` (read from `app/build.gradle.kts`) if not already present — triggering the release workflow.
 
 ### Release workflow
 Fires when pushing a version tag (`v*`). Builds a signed release APK and attaches it to the corresponding GitHub Release.
@@ -46,6 +46,7 @@ Fires when pushing a version tag (`v*`). Builds a signed release APK and attache
 | `STORE_PASSWORD` | Keystore password |
 | `KEY_ALIAS` | Key alias (`literal-memo`) |
 | `KEY_PASSWORD` | Key password |
+| `GH_PAT` | Personal Access Token with `repo` scope (for auto-tag → release trigger) |
 
 Set these in the repo → Settings → Secrets and variables → Actions.
 
