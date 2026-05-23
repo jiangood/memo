@@ -17,7 +17,11 @@ class GitHubTransport @Inject constructor(
     ): Result<Unit> = runCatching {
         val refResult = api.getRef(token, repo)
         if (refResult.isFailure) throw refResult.exceptionOrNull()!!
-        val baseSha = refResult.getOrThrow()
+        val commitSha = refResult.getOrThrow()
+
+        val baseTreeResult = api.getCommitTreeSha(token, repo, commitSha)
+        if (baseTreeResult.isFailure) throw baseTreeResult.exceptionOrNull()!!
+        val baseTreeSha = baseTreeResult.getOrThrow()
 
         val blobShas = mutableMapOf<String, String>()
         for (entry in entries) {
@@ -36,20 +40,16 @@ class GitHubTransport @Inject constructor(
             }
         }
 
-        val treeResult = api.createTree(token, repo, baseSha, treePairs)
+        val treeResult = api.createTree(token, repo, baseTreeSha, treePairs)
         if (treeResult.isFailure) throw treeResult.exceptionOrNull()!!
         val treeSha = treeResult.getOrThrow()
 
-        val baseRefResult = api.getRef(token, repo, "heads/master")
-        if (baseRefResult.isFailure) throw baseRefResult.exceptionOrNull()!!
-        val parentSha = baseRefResult.getOrThrow()
-
         val message = "Sync ${entries.size} change(s)"
-        val commitResult = api.createCommit(token, repo, message, treeSha, parentSha)
+        val commitResult = api.createCommit(token, repo, message, treeSha, commitSha)
         if (commitResult.isFailure) throw commitResult.exceptionOrNull()!!
-        val commitSha = commitResult.getOrThrow()
+        val newCommitSha = commitResult.getOrThrow()
 
-        val refResult2 = api.updateRef(token, repo, "master", commitSha)
+        val refResult2 = api.updateRef(token, repo, "master", newCommitSha)
         if (refResult2.isFailure) throw refResult2.exceptionOrNull()!!
     }
 

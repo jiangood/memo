@@ -161,6 +161,21 @@ class GitHubRepository @Inject constructor() : GitForgeApi {
         }
     }
 
+    suspend fun getCommitTreeSha(token: String, repo: String, commitSha: String): Result<String> {
+        return try {
+            val (code, body) = makeRequest("GET", "$baseUrl/repos/$repo/git/commits/$commitSha", token)
+            when (code) {
+                200 -> {
+                    val obj = JSONObject(body)
+                    Result.success(obj.getJSONObject("tree").getString("sha"))
+                }
+                else -> Result.failure(Exception("Failed to get commit: $code"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun createBlob(token: String, repo: String, content: String): Result<String> {
         return try {
             val encoded = Base64.encodeToString(content.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
