@@ -24,6 +24,34 @@ Minimalist Android note app (Kotlin/Jetpack Compose) with Git-based sync. No fol
 ```
 Release signing: `local.properties` keys `STORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`, or CI env vars `CI_KEYSTORE_PATH`/`STORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD`.
 
+**IMPORTANT:** Local build requires ~2GB+ available RAM. On resource-constrained machines (e.g., <1GB RAM), use CI instead (see CI section below).
+
+## CI / GitHub Actions
+
+| Workflow | File | Trigger | Artifact |
+|---|---|---|---|
+| **Debug Build** | `.github/workflows/debug.yml` | Push/PR to `main` or `develop` | `debug-apk` (Actions artifact) |
+| **Release Build** | `.github/workflows/release.yml` | Push tag `v*` | Uploaded to GitHub Release |
+
+### Debug workflow
+Fires on every push/PR to `main`/`develop`. Builds unsigned debug APK and uploads as a workflow artifact — downloadable from the Actions page.
+
+### Release workflow
+Fires when pushing a version tag (`v*`). Builds a signed release APK and attaches it to the corresponding GitHub Release.
+
+**Required secrets for Release:**
+| Secret | Value |
+|---|---|
+| `KEYSTORE_BASE64` | `base64 literal-memo.jks` output |
+| `STORE_PASSWORD` | Keystore password |
+| `KEY_ALIAS` | Key alias (`literal-memo`) |
+| `KEY_PASSWORD` | Key password |
+
+Set these in the repo → Settings → Secrets and variables → Actions.
+
+### Local CI testing
+CI workflows cannot be run locally. To verify YAML syntax: `python3 -c "import yaml; yaml.safe_load(open('.github/workflows/<file>.yml'))"`.
+
 ## Key Architecture
 
 | Path | Role |
