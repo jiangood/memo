@@ -46,6 +46,10 @@ fun NavGraph(
                         navController.navigate(Routes.MEMO_EDIT)
                     }
                 },
+                onCreateWithContent = { content ->
+                    val encoded = URLEncoder.encode(content, "UTF-8")
+                    navController.navigate("${Routes.MEMO_EDIT}?initialContent=$encoded")
+                },
                 onNavigateToSettings = {
                     navController.navigate(Routes.SETTINGS)
                 }

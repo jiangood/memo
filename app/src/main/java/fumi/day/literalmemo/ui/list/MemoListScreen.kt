@@ -68,6 +68,7 @@ import fumi.day.literalmemo.domain.model.firstLine
 fun MemoListScreen(
     onNavigateToEdit: (String?) -> Unit,
     onNavigateToSettings: () -> Unit,
+    onCreateWithContent: (String) -> Unit,
     viewModel: MemoListViewModel = hiltViewModel()
 ) {
     val memos by viewModel.memos.collectAsState()
@@ -77,6 +78,7 @@ fun MemoListScreen(
     val syncError by viewModel.syncError.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
+    var quickNoteText by remember { mutableStateOf("") }
     val isSearching = searchQuery.isNotBlank()
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -203,43 +205,59 @@ fun MemoListScreen(
             }
         }
     ) { paddingValues ->
-        if (memos.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (isSearching) {
-                        "No memos found."
-                    } else {
-                        "No memos yet.\nTap + to create one."
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-            ) {
-                item { Spacer(modifier = Modifier.height(8.dp)) }
-                itemsIndexed(
-                    items = memos,
-                    key = { _, memo -> memo.fileName }
-                ) { index, memo ->
-                    MemoItem(
-                        memo = memo,
-                        searchQuery = searchQuery,
-                        accentColor = MaterialTheme.colorScheme.primary,
-                        isOdd = index % 2 == 0,
-                        onClick = { onNavigateToEdit(memo.fileName) }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            QuickEntryBar(
+                text = quickNoteText,
+                onTextChange = { quickNoteText = it },
+                onExpand = {
+                    if (quickNoteText.isNotBlank()) {
+                        onCreateWithContent(quickNoteText)
+                        quickNoteText = ""
+                    }
+                },
+                onSubmit = {
+                    if (quickNoteText.isNotBlank()) {
+                        viewModel.createQuickNote(quickNoteText)
+                        quickNoteText = ""
+                    }
+                }
+            )
+            if (memos.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (isSearching) {
+                            "No memos found."
+                        } else {
+                            "No memos yet.\nTap + to create one."
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                    itemsIndexed(
+                        items = memos,
+                        key = { _, memo -> memo.fileName }
+                    ) { index, memo ->
+                        MemoItem(
+                            memo = memo,
+                            searchQuery = searchQuery,
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            isOdd = index % 2 == 0,
+                            onClick = { onNavigateToEdit(memo.fileName) }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
+                }
             }
         }
     }
