@@ -36,18 +36,53 @@ jobs:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
 
-      - name: Create and push tag
+      - name: Build release APK
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
-          GH_PAT: ${{ secrets.GH_PAT }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          b64='${{ secrets.KEYSTORE_BASE64 }}'
+          if [ -z "$b64" ]; then
+            echo "KEYSTORE_BASE64 not set, skipping release build"
+            exit 0
+          fi
+          printf '%s' "$b64" > /tmp/keystore.b64
+          base64 --decode /tmp/keystore.b64 > /tmp/keystore.jks
+          chmod +x gradlew
+          CI_KEYSTORE_PATH=/tmp/keystore.jks \
+            STORE_PASSWORD="$STORE_PASSWORD" \
+            KEY_ALIAS="$KEY_ALIAS" \
+            KEY_PASSWORD="$KEY_PASSWORD" \
+            ./gradlew assembleRelease
+
+      - name: Create release
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(grep 'versionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
           TAG="v$VERSION"
-          if git ls-remote --tags --exit-code origin "$TAG" > /dev/null 2>&1; then
-            echo "Tag $TAG already exists on remote, skipping"
-          else
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG already exists, skipping"
+            exit 0
+          fi
+          if ! git rev-parse "$TAG" > /dev/null 2>&1; then
             git config user.name "github-actions"
             git config user.email "github-actions@github.com"
             git tag "$TAG"
-            git push "https://x-access-token:${GH_PAT}@github.com/${GITHUB_REPOSITORY}" "$TAG"
+            git push origin "$TAG"
+          fi
+          ASSETS=()
+          for apk in app/build/outputs/apk/release/*.apk; do
+            [ -f "$apk" ] && ASSETS+=("$apk")
+          done
+          for apk in app/build/outputs/apk/debug/*.apk; do
+            [ -f "$apk" ] && ASSETS+=("$apk")
+          done
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            gh release create "$TAG" --title "$TAG" --notes "Auto-generated release for $VERSION"
+          else
+            gh release create "$TAG" "${ASSETS[@]}" --title "$TAG" --notes "Auto-generated release for $VERSION"
           fi
