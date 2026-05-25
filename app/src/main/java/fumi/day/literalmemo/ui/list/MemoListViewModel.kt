@@ -9,6 +9,7 @@ import fumi.day.literalmemo.data.prefs.UserPrefs
 import fumi.day.literalmemo.data.repository.MemoRepository
 import fumi.day.literalmemo.domain.model.Memo
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 
 @HiltViewModel
@@ -58,6 +64,23 @@ class MemoListViewModel @Inject constructor(
 
     fun clearSearch() {
         _searchQuery.value = ""
+    }
+
+    fun createQuickNote(content: String) {
+        if (content.isBlank()) return
+        val formatter = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+        val fileName = "${formatter.format(Date())}.md"
+        val memo = Memo(
+            fileName = fileName,
+            content = content,
+            updatedAt = System.currentTimeMillis()
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            memoRepository.save(memo)
+            syncManager.launchSync()
+        }
     }
 
     fun sync() {
