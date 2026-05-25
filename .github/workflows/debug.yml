@@ -43,8 +43,8 @@ jobs:
         run: |
           VERSION=$(grep 'versionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
           TAG="v$VERSION"
-          if git tag -l "$TAG" | grep -q .; then
-            echo "Tag $TAG already exists, skipping"
+          if git ls-remote --tags --exit-code origin "$TAG" > /dev/null 2>&1; then
+            echo "Tag $TAG already exists on remote, skipping"
           else
             git config user.name "github-actions"
             git config user.email "github-actions@github.com"
