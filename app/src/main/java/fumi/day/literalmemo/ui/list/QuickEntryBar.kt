@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,6 +73,18 @@ fun QuickEntryBar(
             }
         )
         Spacer(modifier = Modifier.width(4.dp))
+        if (text.isNotEmpty()) {
+            IconButton(
+                onClick = onSubmit,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Save",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
         IconButton(
             onClick = onExpand,
             modifier = Modifier.size(36.dp)
